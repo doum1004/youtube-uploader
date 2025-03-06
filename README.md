@@ -1,3 +1,10 @@
+# step by step to run
+
+1. Install Nodejs Current Version
+2. Go to the folder and npm install
+3. make sure npx are in global path
+
+
 <h1 align="center">Youtube Videos Uploader</h1>
 
 <p align="center">

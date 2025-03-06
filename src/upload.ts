@@ -9,7 +9,7 @@ import {
     GameData
 } from './types'
 import puppeteer from 'puppeteer-extra'
-import { PuppeteerNodeLaunchOptions, Browser, Page } from 'puppeteer'
+import { PuppeteerNodeLaunchOptions, Browser, Page, ElementHandle } from 'puppeteer'
 import fs from 'fs-extra'
 import path from 'path'
 
@@ -261,7 +261,7 @@ async function uploadVideo(videoJSON: Video, messageTransport: MessageTransport)
 
     // Wait until title & description box pops up
     if (thumb) {
-        let thumbnailChooserXpath = xpathTextSelector('upload thumbnail')
+        let thumbnailChooserXpath = xpathTextSelector('upload file')
         await page.waitForXPath(thumbnailChooserXpath)
         const thumbBtn = await page.$x(thumbnailChooserXpath)
         const [thumbChooser] = await Promise.all([
@@ -368,13 +368,22 @@ async function uploadVideo(videoJSON: Video, messageTransport: MessageTransport)
     }
 
     // Add tags
-    if (tags) {
-        //show more
+    let tagsStr = '';
+    if (Array.isArray(tags)) {
+        tagsStr = tags.join(', ');
+    }
+    else if (typeof tags === 'string') {
+        tagsStr = tags;
+    }
+    if (tagsStr !== '') {
+        if (tagsStr.length > 395) {
+            tagsStr = tagsStr.substring(0, 495);
+        }
         try {
             await page.focus(`[aria-label="Tags"]`)
-            await page.type(`[aria-label="Tags"]`, tags.join(', ').substring(0, 495) + ', ')
+            await page.type(`[aria-label="Tags"]`, tagsStr + ', ')
         } catch (err) {}
-        messageTransport.debug(`  >> ${videoJSON.title} - Tags set to ${tags.join(', ')}`);
+        messageTransport.debug(`  >> ${videoJSON.title} - Tags set to ${tagsStr}`);
     }
 
     // Set pusblish to subscription feed and notify subscribers to false
@@ -407,12 +416,33 @@ async function uploadVideo(videoJSON: Video, messageTransport: MessageTransport)
         
     }
 
-    const nextBtnXPath = "//*[normalize-space(text())='Next']/parent::*[not(@disabled)]"
-    let next
+    async function clickNextButton() {
+        const nextBtnXPath = "//*[normalize-space(text())='Next']/parent::*[not(@disabled)]";
+        let next = null;
+        let tryCount = 5;
+        while ((next == null || next.length === 0) && tryCount > 0) {
+            await page.waitForTimeout(1500);
+            await page.waitForXPath(nextBtnXPath);
+            next = await page.$x(nextBtnXPath);
+            tryCount--;
+        }
+        if (next != null && next.length > 0) {
+            await next[0].click();
+        } else {
+            throw new Error('Next button not found');
+        }
+    }
 
-    await page.waitForXPath(nextBtnXPath)
-    next = await page.$x(nextBtnXPath)
-    await next[0].click()
+    // const nextBtnXPath = "//*[normalize-space(text())='Next']/parent::*[not(@disabled)]"
+    // let next
+    // await page.waitForXPath(nextBtnXPath)
+    // next = await page.$x(nextBtnXPath)
+    // if (next.length > 0) {
+    //     await next[0].click()
+    // } else {
+    //     throw new Error('Next button not found')
+    // }
+    await clickNextButton();
 
     if (videoJSON.isChannelMonetized) {
         try {
@@ -443,11 +473,11 @@ async function uploadVideo(videoJSON: Video, messageTransport: MessageTransport)
                 'ytcp-video-monetization-edit-dialog.cancel-button-hidden .ytcp-video-monetization-edit-dialog #save-button'
             )
 
-            await page.waitForTimeout(1500)
-
-            await page.waitForXPath(nextBtnXPath)
-            next = await page.$x(nextBtnXPath)
-            await next[0].click()
+            // await page.waitForTimeout(1500)
+            // await page.waitForXPath(nextBtnXPath)
+            // next = await page.$x(nextBtnXPath)
+            // await next[0].click()
+            await clickNextButton();
         } catch {}
 
         try {
@@ -477,26 +507,33 @@ async function uploadVideo(videoJSON: Video, messageTransport: MessageTransport)
                 ).click()
             )
 
-            await page.waitForXPath(nextBtnXPath)
-            next = await page.$x(nextBtnXPath)
-            await next[0].click()
-
-            await page.waitForTimeout(1500)
+            // await page.waitForXPath(nextBtnXPath)
+            // next = await page.$x(nextBtnXPath)
+            // await next[0].click()
+            // await page.waitForTimeout(1500)
+            await clickNextButton();
         } catch {}
         messageTransport.debug(`  >> ${videoJSON.title} - Channel monetization set`);
     }
 
-    await sleep(100);
-    await page.waitForXPath(nextBtnXPath)
     // click next button
-    await sleep(100);
-    next = await page.$x(nextBtnXPath)
-    await next[0].click()
-    await page.waitForXPath(nextBtnXPath)
+    // await sleep(500);
+    // await page.waitForXPath(nextBtnXPath)
+    // await sleep(500);
+    // next = await page.$x(nextBtnXPath)
+    // await next[0].click()
+    await clickNextButton();
+
     // click next button
-    await sleep(100);
-    next = await page.$x(nextBtnXPath)
-    await next[0].click()
+    // await sleep(3000);
+    // await page.waitForXPath(nextBtnXPath)
+    // next = await page.$x(nextBtnXPath)
+    // if (next.length === 0) {
+    //     await page.waitForXPath(nextBtnXPath)
+    //     next = await page.$x(nextBtnXPath)
+    // }
+    // await next[0].click()
+    await clickNextButton();
 
     if (videoJSON.publishType) {
         await page.waitForSelector('#privacy-radios *[name="' + videoJSON.publishType + '"]', { visible: true })
@@ -1098,7 +1135,7 @@ async function changeHomePageLangIfNeeded(localPage: Page) {
     }
 
     if (selectedLang.includes('English')) {
-        await localPage.goto(uploadURL)
+        //await localPage.goto(uploadURL)
 
         return
     }
@@ -1348,9 +1385,10 @@ async function changeChannel(channelName: string) {
 
     await element!.click()
 
-    await page.waitForNavigation({
-        waitUntil: 'networkidle0'
-    })
+    // await page.waitForNavigation({
+    //     waitUntil: 'networkidle0'
+    // })
+    await sleep(2000)
 }
 
 function escapeQuotesForXPath(str: string) {
